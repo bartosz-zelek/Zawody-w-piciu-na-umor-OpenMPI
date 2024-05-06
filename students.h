@@ -24,9 +24,7 @@ class Students
     unsigned A;
 
 public:
-    Students(unsigned _N, unsigned _A, unsigned _rank) : reply_counter(N),
-                                                         defer_counter(N),
-                                                         state(StudentsState::IDLE),
+    Students(unsigned _N, unsigned _A, unsigned _rank) : state(StudentsState::IDLE),
                                                          global_counter(0),
                                                          local_counter(0),
                                                          rank(_rank),
@@ -60,7 +58,7 @@ public:
     {
         std::cerr << "[" << global_counter << "] Students " << rank << " received request from " << Y_rank << " with counter " << Y_counter << std::endl;
         global_counter = std::max(global_counter, Y_counter);
-        if (state == StudentsState::DRINKING || (state == StudentsState::WANT_TO_DRINK) && (local_counter < Y_counter || (local_counter == Y_counter && rank < Y_rank)))
+        if (state == StudentsState::DRINKING || ((state == StudentsState::WANT_TO_DRINK) && (local_counter < Y_counter || (local_counter == Y_counter && rank < Y_rank))))
         {
             std::cerr << "[" << global_counter << "] Students " << rank << " deferred reply to " << Y_rank << std::endl;
             ++defer_counter[Y_rank];
