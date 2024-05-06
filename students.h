@@ -33,13 +33,15 @@ public:
                                                          N(_N),
                                                          A(_A)
     {
+        reply_counter.resize(N);
+        defer_counter.resize(N);
         std::fill(reply_counter.begin(), reply_counter.end(), 0);
         std::fill(defer_counter.begin(), defer_counter.end(), 0);
     }
 
     void want_to_drink()
     {
-        std::cerr << "[" << local_counter << "] Students " << rank << " wants to drink" << std::endl;
+        std::cerr << "[" << global_counter << "] Students " << rank << " wants to drink" << std::endl;
         state = StudentsState::WANT_TO_DRINK;
         local_counter = global_counter + 1;
         for (unsigned i = 0; i < N; ++i)
@@ -51,20 +53,21 @@ public:
                 ++reply_counter[i];
             }
         }
+        conditional_drink();
     }
 
     void handle_request(unsigned Y_rank, unsigned Y_counter)
     {
-        std::cerr << "[" << local_counter << "] Students " << rank << " received request from " << Y_rank << " with counter " << Y_counter << std::endl;
+        std::cerr << "[" << global_counter << "] Students " << rank << " received request from " << Y_rank << " with counter " << Y_counter << std::endl;
         global_counter = std::max(global_counter, Y_counter);
         if (state == StudentsState::DRINKING || (state == StudentsState::WANT_TO_DRINK) && (local_counter < Y_counter || (local_counter == Y_counter && rank < Y_rank)))
         {
-            std::cerr << "[" << local_counter << "] Students " << rank << " deferred reply to " << Y_rank << std::endl;
+            std::cerr << "[" << global_counter << "] Students " << rank << " deferred reply to " << Y_rank << std::endl;
             ++defer_counter[Y_rank];
         }
         else
         {
-            std::cerr << "[" << local_counter << "] Students " << rank << " replied to " << Y_rank << std::endl;
+            std::cerr << "[" << global_counter << "] Students " << rank << " replied to " << Y_rank << std::endl;
             unsigned no_replays = 1;
             MPI::COMM_WORLD.Send(&no_replays, 1, MPI::INT, Y_rank, MessageType::REPLY);
         }
@@ -80,14 +83,12 @@ public:
                 ++not_drinking;
             }
         }
-        std::cerr << "[" << local_counter << "] Students " << rank << " count not drinking " << not_drinking << std::endl;
+        std::cerr << "[" << global_counter << "] Students " << rank << " count not drinking " << not_drinking << std::endl;
         return not_drinking;
     }
 
-    void handle_reply(unsigned Y_rank, unsigned no_replays)
+    void conditional_drink()
     {
-        std::cerr << "[" << local_counter << "] Students " << rank << " received reply from " << Y_rank << " with no_replays " << no_replays << std::endl;
-        reply_counter[Y_rank] -= no_replays;
         if (state == StudentsState::WANT_TO_DRINK && count_not_drinking() >= N - A)
         {
             state = StudentsState::DRINKING;
@@ -97,9 +98,16 @@ public:
         }
     }
 
+    void handle_reply(unsigned Y_rank, unsigned no_replays)
+    {
+        std::cerr << "[" << global_counter << "] Students " << rank << " received reply from " << Y_rank << " with no_replays " << no_replays << std::endl;
+        reply_counter[Y_rank] -= no_replays;
+        conditional_drink();
+    }
+
     void stop_drinking()
     {
-        std::cerr << "[" << local_counter << "] Students " << rank << " stopped drinking" << std::endl;
+        std::cerr << "[" << global_counter << "] Students " << rank << " stopped drinking" << std::endl;
         state = StudentsState::IDLE;
         for (unsigned i = 0; i < N; ++i)
         {
